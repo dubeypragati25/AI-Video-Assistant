@@ -1,9 +1,6 @@
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
-from main import run_pipeline
-from core.rag_engine import load_rag_chain, ask_question
-
 
 app = FastAPI(
     title="AI Video Assistant AI API",
@@ -46,6 +43,9 @@ def health():
 def process_meeting(request: MeetingRequest):
 
     try:
+
+        # Import heavy AI pipeline only when needed
+        from main import run_pipeline
 
         result = run_pipeline(
             request.source,
@@ -90,8 +90,10 @@ def ask_meeting_question(request: AskRequest):
                 detail="Question is required"
             )
 
+        # Import RAG modules only when needed
+        from core.rag_engine import load_rag_chain, ask_question
+
         # Load the existing RAG chain
-        # from the ChromaDB collection
         rag_chain = load_rag_chain(
             request.meeting_id
         )
