@@ -1,50 +1,96 @@
-from langchain_mistralai import ChatMistralAI
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import StrOutputParser
-from langchain_core.runnables import RunnablePassthrough, RunnableLambda
-import os 
+from dotenv import load_dotenv
+from groq import Groq
+
+import os
+
+load_dotenv()
+
+
+MODEL_NAME = "openai/gpt-oss-120b"
 
 
 def get_llm():
-    return ChatMistralAI(model = "mistral-small-latest", mistral_api_key = os.getenv("MISTRAL_API_KEY"),temperature=0.2)
-
-
-
-def build_chain(system_prompt : str):
-    llm = get_llm()
-    return (
-        RunnablePassthrough() | RunnableLambda(lambda x : {"text" : x}) |ChatPromptTemplate.from_messages([
-        ("system", system_prompt),
-        ("human","{text}"),
-    ]) | llm |StrOutputParser()
+    return Groq(
+        api_key=os.getenv("GROQ_API_KEY")
     )
 
-def extract_action_items(transcript:str)->str:
-    chain = build_chain(
-         "You are an expert meeting analyst. From the meeting transcript, "
+
+def generate_response(
+    client,
+    system_instruction: str,
+    text: str
+) -> str:
+
+    response = client.chat.completions.create(
+        model=MODEL_NAME,
+        messages=[
+            {
+                "role": "system",
+                "content": system_instruction
+            },
+            {
+                "role": "user",
+                "content": text
+            }
+        ],
+        temperature=0.2,
+        max_completion_tokens=2048,
+        include_reasoning=False
+    )
+
+    return response.choices[0].message.content
+
+
+def extract_action_items(transcript: str) -> str:
+
+    client = get_llm()
+
+    instruction = (
+        "You are an expert meeting analyst. From the meeting transcript, "
         "extract all action items. For each provide:\n"
         "- Task description\n"
         "- Owner (who is responsible)\n"
         "- Deadline (if mentioned, else write 'Not specified')\n\n"
-        "Format as a numbered list. If none found say 'No action items found.'"
+        "Format as a numbered list. If none found say "
+        "'No action items found.'"
     )
 
-    return chain.invoke(transcript)
+    return generate_response(
+        client,
+        instruction,
+        transcript
+    )
 
 
 def extract_key_decisions(transcript: str) -> str:
-    chain = build_chain(
+
+    client = get_llm()
+
+    instruction = (
         "You are an expert meeting analyst. From the meeting transcript, "
         "extract all key decisions made. Format as a numbered list. "
         "If none found say 'No key decisions found.'"
     )
-    return chain.invoke(transcript)
+
+    return generate_response(
+        client,
+        instruction,
+        transcript
+    )
 
 
 def extract_questions(transcript: str) -> str:
-    chain = build_chain(
+
+    client = get_llm()
+
+    instruction = (
         "From the meeting transcript, extract all unresolved questions "
         "or topics needing follow-up. Format as a numbered list. "
         "If none found say 'No open questions found.'"
     )
-    return chain.invoke(transcript)
+
+    return generate_response(
+        client,
+        instruction,
+        transcript
+    )

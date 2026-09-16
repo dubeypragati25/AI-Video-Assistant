@@ -1,21 +1,73 @@
+from dotenv import load_dotenv
+from groq import Groq
+
+from langchain_core.runnables import RunnableLambda
+
+from core.vector_stores import (
+    build_vector_store,
+    load_vector_store,
+    get_retriever
+)
+
 import os
-from langchain_mistralai import ChatMistralAI
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import StrOutputParser
-from langchain_core.runnables import RunnablePassthrough, RunnableLambda
-from core.vector_stores import build_vector_store, load_vector_store, get_retriever
+
+load_dotenv()
+
+
+MODEL_NAME = "openai/gpt-oss-120b"
+
 
 def get_llm():
-    return ChatMistralAI(
-        model="mistral-small-latest",
-        mistral_api_key=os.getenv("MISTRAL_API_KEY"),
-        temperature=0.3,
+    return Groq(
+        api_key=os.getenv("GROQ_API_KEY")
     )
 
+
+def generate_response(
+    client,
+    system_instruction: str,
+    context: str,
+    question: str
+) -> str:
+
+    prompt = f"""
+Context from meeting transcript:
+
+{context}
+
+User question:
+
+{question}
+"""
+
+    response = client.chat.completions.create(
+        model=MODEL_NAME,
+        messages=[
+            {
+                "role": "system",
+                "content": system_instruction
+            },
+            {
+                "role": "user",
+                "content": prompt
+            }
+        ],
+        temperature=0.2,
+        max_completion_tokens=2048,
+        include_reasoning=False
+    )
+
+    return response.choices[0].message.content
+
+
 def format_docs(docs):
-    return "\n\n".join([doc.page_content for doc in docs])
+    return "\n\n".join(
+        [doc.page_content for doc in docs]
+    )
+
 
 def build_rag_chain(transcript: str, meeting_id: str):
+
     collection_name = f"meeting_{meeting_id}"
 
     vector_store = build_vector_store(
@@ -23,78 +75,96 @@ def build_rag_chain(transcript: str, meeting_id: str):
         collection_name=collection_name
     )
 
-    retriever = get_retriever(vector_store, k=4)
-    llm = get_llm()
+    retriever = get_retriever(
+        vector_store,
+        k=4
+    )
 
-    prompt = ChatPromptTemplate.from_messages(
-  
-        [(
-            "system",
-            """You are an expert meeting assistant. Answer the user's question 
-based ONLY on the meeting transcript context provided below.
+    client = get_llm()
 
-If the answer is not found in the context, say: 
+    system_instruction = """
+You are an expert meeting assistant.
+
+Answer the user's question based ONLY on the meeting transcript
+context provided.
+
+If the answer is not found in the context, say:
+
 "I could not find this information in the meeting transcript."
 
-Always be concise and precise. If quoting someone, mention it clearly.
+Always be concise and precise.
 
-Context from meeting transcript:
-{context}""",
-        ),
-        ("human", "{question}"),
-    ]
+If quoting someone, mention it clearly.
+"""
+
+    def rag_function(question):
+
+        docs = retriever.invoke(question)
+
+        context = format_docs(docs)
+
+        return generate_response(
+            client,
+            system_instruction,
+            context,
+            question
+        )
+
+    return RunnableLambda(rag_function)
+
+
+def load_rag_chain(meeting_id: str):
+
+    collection_name = f"meeting_{meeting_id}"
+
+    vector_store = load_vector_store(
+        collection_name=collection_name
     )
 
-    #full LCEL Rag pipeline 
-
-    rag_chain = (
-
-        {"context" : retriever | RunnableLambda(format_docs),
-         "question": RunnablePassthrough()
-         }
-         |prompt|llm|StrOutputParser()
+    retriever = get_retriever(
+        vector_store,
+        k=4
     )
 
-    return rag_chain
+    client = get_llm()
 
+    system_instruction = """
+You are an expert meeting assistant.
 
-def load_rag_chain():
-    vector_store = load_vector_store()
-    retriver = get_retriever()
+Answer the user's question based ONLY on the meeting transcript
+context provided.
 
-    llm = get_llm()
-    prompt = ChatPromptTemplate.from_messages([
-        (
-            "system",
-            """You are an expert meeting assistant. Answer the user's question 
-based ONLY on the meeting transcript context provided below.
+If the answer is not found in the context, say:
 
-If the answer is not found in the context, say: 
 "I could not find this information in the meeting transcript."
 
-Always be concise and precise. If quoting someone, mention it clearly.
+Always be concise and precise.
 
-Context from meeting transcript:
-{context}""",
-        ),
-        ("human", "{question}"),
-    ])
+If quoting someone, mention it clearly.
+"""
 
-    rag_chain = (
-        {
-            "context":  retriver| RunnableLambda(format_docs),
-            "question": RunnablePassthrough(),
-        }
-        | prompt
-        | llm
-        | StrOutputParser()
-    )
+    def rag_function(question):
 
-    return rag_chain
+        docs = retriever.invoke(question)
+
+        context = format_docs(docs)
+
+        return generate_response(
+            client,
+            system_instruction,
+            context,
+            question
+        )
+
+    return RunnableLambda(rag_function)
 
 
-def ask_question(rag_chain, question:str) -> str:
+def ask_question(rag_chain, question: str) -> str:
+
     print(f"Question : {question}")
+
     answer = rag_chain.invoke(question)
-    print(f"answer :{answer}")
+
+    print(f"answer : {answer}")
+
     return answer

@@ -1,77 +1,103 @@
-from langchain_mistralai import ChatMistralAI
-from langchain_core.prompts import ChatPromptTemplate
-from langchain_core.output_parsers import StrOutputParser
+from dotenv import load_dotenv
+from groq import Groq
+
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from langchain_core.runnables import RunnablePassthrough, RunnableLambda
 
 import os
 
+load_dotenv()
+
+
+MODEL_NAME = "openai/gpt-oss-120b"
+
+
 def get_llm():
-    return ChatMistralAI(model = "mistral-small-latest", mistral_api_key = os.getenv("MISTRAL_API_KEY"),temperature=0.3)
+    return Groq(
+        api_key=os.getenv("GROQ_API_KEY")
+    )
+
+
+def generate_response(
+    client,
+    system_instruction: str,
+    text: str
+) -> str:
+
+    response = client.chat.completions.create(
+        model=MODEL_NAME,
+        messages=[
+            {
+                "role": "system",
+                "content": system_instruction
+            },
+            {
+                "role": "user",
+                "content": text
+            }
+        ],
+        temperature=0.3,
+        max_completion_tokens=2048,
+        include_reasoning=False
+    )
+
+    return response.choices[0].message.content
 
 
 def split_transcript(transcript: str) -> list:
+
     splitter = RecursiveCharacterTextSplitter(
-        chunk_size = 3000,
-        chunk_overlap = 200
+        chunk_size=3000,
+        chunk_overlap=200
     )
 
     return splitter.split_text(transcript)
 
 
-def summarize(transcript : str) -> str:
-    llm = get_llm()
+def summarize(transcript: str) -> str:
 
-    map_prompt = ChatPromptTemplate.from_messages(
-        [
-        ("system", "Summarize this portion of a meeting transcript concisely."),
-        ("human", "{text}"),
-    ]
+    client = get_llm()
+
+    map_instruction = (
+        "Summarize this portion of a meeting transcript concisely."
     )
-
-    map_chain = map_prompt | llm | StrOutputParser()
 
     chunks = split_transcript(transcript)
 
-    chunk_summaries = [map_chain.invoke({"text" : chunk}) for chunk in chunks]
+    chunk_summaries = [
+        generate_response(
+            client,
+            map_instruction,
+            chunk
+        )
+        for chunk in chunks
+    ]
 
     combined = "\n\n".join(chunk_summaries)
 
-    combined_prompt = ChatPromptTemplate.from_messages(
-        [
-        (
-            "system",
-            "You are an expert meeting summarizer. Combine these partial summaries "
-            "into one final professional meeting summary in bullet points.",
-        ),
-        ("human", "{text}"),
-    ]
+    combined_instruction = (
+        "You are an expert meeting summarizer. "
+        "Combine these partial summaries into one final professional "
+        "meeting summary in bullet points."
     )
 
-    combined_chain = (
-        RunnablePassthrough() | RunnableLambda(lambda x:{"text":x}) | combined_prompt | llm | StrOutputParser()
+    return generate_response(
+        client,
+        combined_instruction,
+        combined
     )
 
-    return combined_chain.invoke(combined)
 
+def generate_title(transcript: str) -> str:
 
-def generate_title(transcipt : str) -> str:
-    llm = get_llm()
+    client = get_llm()
 
-    
-
-    title_chain = (
-        RunnablePassthrough() | RunnableLambda(lambda x:{"text":x}) | 
-        ChatPromptTemplate.from_messages([
-             (
-                "system",
-                "Based on the meeting transcript, generate a short professional meeting title "
-                "(max 8 words). Only return the title, nothing else.",
-            ),
-            ("human", "{text}"),
-        ])
-        | llm
-        |StrOutputParser()
+    title_instruction = (
+        "Based on the meeting transcript, generate a short professional "
+        "meeting title (max 8 words). Only return the title, nothing else."
     )
 
-    return title_chain.invoke(transcipt[:2000])
+    return generate_response(
+        client,
+        title_instruction,
+        transcript[:2000]
+    )
