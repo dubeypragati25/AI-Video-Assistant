@@ -183,12 +183,3 @@ cd client
 npm install
 npm run dev
 
-Environment Variables:
-server/.env:
-PORT=5001
-MONGO_URI=your_mongodb_connection_string
-JWT_SECRET=your_jwt_secret
-PYTHON_AI_URL=http://127.0.0.1:8000
-CLIENT_URL=http://localhost:5173
-client/.env:
-VITE_API_URL=http://localhost:5001/api
