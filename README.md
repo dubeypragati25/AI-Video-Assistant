@@ -1,129 +1,158 @@
-# AI Video Assistant
+# AI Video Assistant | Multimodal Meeting Intelligence
 
-An AI-powered meeting intelligence platform that converts YouTube videos or uploaded audio/video files into searchable transcripts, summaries, decisions, action items, and AI-powered answers
+An end-to-end AI-powered meeting intelligence platform that transforms YouTube videos and uploaded audio/video files into searchable transcripts, structured meeting insights, and context-aware conversational answers.
 
-## Features
+Combining speech recognition, LLM-powered summarization, semantic search, and Retrieval-Augmented Generation (RAG), the application turns unstructured meeting content into an interactive knowledge base.
 
-- Process YouTube videos or uploaded files
-- Speech transcription using Whisper
-- AI-generated meeting summaries
-- Extract action items
-- Extract key decisions
-- Extract open questions
-- Ask questions about meetings using RAG
-- Semantic search with ChromaDB
-- HuggingFace embeddings
-- Groq GPT-OSS 120B
-- JWT authentication
-- User-specific meeting data
-- Meeting dashboard
-- Markdown-rendered AI responses
-- Responsive UI
+## Key Features
 
+- **Media Processing:** Process YouTube videos and uploaded audio/video files.
+- **Speech Recognition:** Transcribe audio using OpenAI Whisper.
+- **Multilingual Support:** Hinglish transcription workflow using Sarvam AI.
+- **AI Summarization:** Generate meeting summaries and structured insights.
+- **Information Extraction:** Identify action items, key decisions, and open questions.
+- **Conversational RAG:** Ask natural-language questions about processed meetings.
+- **Semantic Search:** Retrieve relevant transcript segments using vector similarity.
+- **Vector Database:** Store and retrieve embeddings using ChromaDB.
+- **User Authentication:** JWT-based authentication and protected APIs.
+- **Meeting Management:** Maintain user-specific meeting history and generated insights.
 
 ## System Architecture
 
+The application uses a modular architecture with separate frontend, backend, and AI processing services.
 
-React Frontend
-      │
-      ▼
-Node.js + Express
-      │
-      ├──────────────► MongoDB Atlas
-      │
-      ▼
-Python FastAPI
-      │
-      ▼
-AI Processing Pipeline
-      │
-      ├── Whisper → Transcription
-      ├── Groq → Summarization & Extraction
-      │
-      └── RAG
-           ├── HuggingFace Embeddings
-           ├── ChromaDB
-           ├── Retriever (Top 4)
-           └── Groq GPT-OSS 120B
+```text
+                React Frontend
+                      |
+                   REST APIs
+                      |
+               Node.js + Express
+                      |
+              +-------+--------+
+              |                |
+         MongoDB Atlas     Python FastAPI
+              |                |
+        Meeting Data       AI Processing
+                               |
+                    +----------+----------+
+                    |          |          |
+                 Whisper     LLM       RAG Engine
+                    |          |          |
+                Transcript  Summaries  Embeddings
+                               |          |
+                               |       ChromaDB
+                               |          |
+                               |      Retriever
+                               |          |
+                               +---- Context
+                                      |
+                                      v
+                                   Groq LLM
+                                      |
+                                      v
+                                  AI Answer
+```
 
 ## How It Works
 
-### 1. Input
+**1. Media Ingestion & Audio Processing**
 
-The user provides a YouTube URL or supported local media source.
+Users provide a YouTube URL or upload a supported local media file. Audio is extracted, converted into the required format, and segmented for transcription.
 
-### 2. Audio Processing
+*Tools: yt-dlp, FFmpeg, Pydub.*
 
-The input media is processed and converted into audio chunks suitable for transcription.
+**2. Speech Recognition**
 
-### 3. Transcription
+OpenAI Whisper converts processed audio into text transcripts. The application also includes a Hinglish transcription workflow using Sarvam AI.
 
-Whisper converts the meeting audio into a text transcript.
+**3. Meeting Intelligence**
 
-The project also contains a Hinglish transcription path using Sarvam AI.
+Transcripts are processed using LangChain and LLM integration to generate:
 
-### 4. Meeting Analysis
-
-The transcript is processed using LangChain and Mistral to generate:
-
-- Meeting title
-- Meeting summary
+- Meeting title and summary
 - Action items
 - Key decisions
 - Open questions
 
-### 5. RAG-Based Question Answering
+Long transcripts are divided into manageable chunks using LangChain's `RecursiveCharacterTextSplitter`.
 
-The transcript is divided into smaller chunks and converted into vector embeddings.
+**4. Retrieval-Augmented Generation (RAG)**
 
-These embeddings are stored in ChromaDB and used for semantic retrieval.
+A RAG pipeline enables users to ask questions about their meeting transcripts.
 
-When a user asks a question, relevant transcript chunks are retrieved and provided to the language model to generate a context-aware answer.
+*Document Indexing*
 
-User Question
-      ↓
-ChromaDB Retriever
-      ↓
-Top 4 Relevant Transcript Chunks
-      ↓
-Context + Question
-      ↓
-Groq GPT-OSS 120B
-      ↓
-AI Answer
-
-## Tech Stack
-
-### Backend
-- Node.js
-Express.js
-MongoDB
-Mongoose
-JWT
-bcryptjs
-Axios
-
-### AI / NLP
-- Python
-FastAPI
-Whisper
-Groq GPT-OSS 120B
-LangChain
+```text
+Meeting Transcript
+        |
+        v
+Text Chunking
+        |
+        v
 HuggingFace Embeddings
+        |
+        v
+Vector Representations
+        |
+        v
 ChromaDB
+```
 
-### Frontend
-- React
-Vite
-React Router
-Axios
-Lucide React
-Framer Motion
-Recharts
-React Markdown
+*Query Processing*
+
+```text
+User Question
+      |
+      v
+ChromaDB Retriever
+      |
+      v
+Top 4 Relevant Chunks
+      |
+      v
+Retrieved Context + Question
+      |
+      v
+Groq GPT-OSS 120B
+      |
+      v
+Context-Aware Answer
+```
+
+The retrieval pipeline uses semantic embeddings to identify relevant transcript segments and supplies the retrieved context to the LLM for meeting-specific answer generation.
+
+## RAG Implementation Details
+
+| Component | Implementation |
+|---|---|
+| Document Chunking | LangChain RecursiveCharacterTextSplitter |
+| Embedding Generation | HuggingFace Embeddings |
+| Vector Storage | ChromaDB |
+| Retrieval Strategy | Semantic similarity search |
+| Retrieval Configuration | Top 4 relevant chunks |
+| Answer Generation | Groq GPT-OSS 120B |
+
+This architecture allows users to retrieve information from lengthy transcripts without passing the entire meeting content to the LLM for every query.
+
+## Technology Stack
+
+| Layer | Technologies |
+|---|---|
+| Frontend | React, Vite, React Router, Axios |
+| Backend | Node.js, Express.js |
+| Database | MongoDB Atlas, Mongoose |
+| Authentication | JWT, bcryptjs |
+| AI Service | Python, FastAPI |
+| Speech Recognition | OpenAI Whisper, Sarvam AI |
+| LLM Inference | Groq, GPT-OSS 120B |
+| AI Orchestration | LangChain |
+| Embeddings | HuggingFace |
+| Vector Database | ChromaDB |
+| Audio Processing | yt-dlp, FFmpeg, Pydub |
 
 ## Project Structure
 
+```text
 AI_video_assistant/
 │
 ├── core/
@@ -150,9 +179,7 @@ AI_video_assistant/
 │   └── src/
 │       ├── components/
 │       ├── context/
-│       ├── controllers/
 │       ├── hooks/
-│       ├── models/
 │       ├── routes/
 │       ├── services/
 │       ├── views/
@@ -164,22 +191,56 @@ AI_video_assistant/
 ├── main.py
 ├── Requirements.txt
 └── README.md
+```
 
-Setup
+## Getting Started
 
-Python AI Service:
-python3 -m venv .venv
+### Prerequisites
+
+- Python 3.11+
+- Node.js and npm
+- MongoDB Atlas or a MongoDB instance
+- FFmpeg
+- Required API credentials
+
+### 1. Clone the Repository
+
+```bash
+git clone <YOUR_REPOSITORY_URL>
+cd AI_video_assistant
+```
+
+### 2. Set Up the AI Service
+
+```bash
+python -m venv .venv
+
+# macOS / Linux
 source .venv/bin/activate
-pip install -r Requirements.txt
-uvicorn api:app --reload --port 8000
 
-Backend:
+# Windows
+.venv\Scripts\activate
+
+pip install -r Requirements.txt
+
+uvicorn api:app --reload --port 8000
+```
+
+### 3. Set Up the Backend
+
+```bash
 cd server
 npm install
 npm run dev
+```
 
-Frontend:
+### 4. Set Up the Frontend
+
+```bash
 cd client
 npm install
 npm run dev
+```
 
+
+**Built with Python, React, and modern AI technologies to explore multimodal processing, semantic retrieval, and Retrieval-Augmented Generation.**
